@@ -2,78 +2,94 @@
 #include <LiquidCrystal_I2C.h>
 #include <Servo.h>
 
-LiquidCrystal_I2C lcd(0x3F, 16, 2);  // LCD I2C address may be 0x27 or 0x3F
-Servo myservo;
+LiquidCrystal_I2C lcd(0x3F, 16, 2);  // Adjust I2C address if needed (0x27 or 0x3F)
+Servo gateServo;
 
-int IR1 = 2;    // Entry sensor
-int IR2 = 4;    // Exit sensor
-int Slot = 4;   // Total parking slots
-int flag1 = 0;  // Entry flag
-int flag2 = 0;  // Exit flag
+const int IR_ENTRY = 2;  // Use const for constants
+const int IR_EXIT = 4;
+int SLOT_COUNT = 4;
+
+bool entryFlag = false;  // Use bool for flags
+bool exitFlag = false;
 
 void setup() {
   lcd.init();
   lcd.backlight();
 
-  pinMode(IR1, INPUT);
-  pinMode(IR2, INPUT);
+  pinMode(IR_ENTRY, INPUT);
+  pinMode(IR_EXIT, INPUT);
 
-  myservo.attach(3);
-  myservo.write(100);  // Servo closed position
+  gateServo.attach(3);
+  gateServo.write(90); // Gate closed position
 
   lcd.setCursor(0, 0);
-  lcd.print(" ARDUINO ");
+  lcd.print(" SMART PARKING ");
   lcd.setCursor(0, 1);
-  lcd.print("PARKING SYSTEM");
+  lcd.print("   SYSTEM READY  ");
   delay(2000);
   lcd.clear();
 }
 
 void loop() {
-  // Entry detection
-  if (digitalRead(IR1) == LOW && flag1 == 0) {
-    flag1 = 1;
-    if (Slot > 0) {
-      myservo.write(0); // Open gate
-      Slot--;
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Car Entered");
-      delay(2000);
+  // Entry Sensor Trigger
+  if (digitalRead(IR_ENTRY) == LOW && !entryFlag) {
+    entryFlag = true;
+    if (SLOT_COUNT > 0) {
+      SLOT_COUNT--;
+      openGate("Car Entered");
     } else {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("SORRY :(");
-      lcd.setCursor(0, 1);
-      lcd.print("Parking Full");
-      delay(3000);
+      displayFullMessage();
     }
   }
 
-  // Exit detection
-  if (digitalRead(IR2) == LOW && flag2 == 0) {
-    flag2 = 1;
-    myservo.write(0); // Open gate
-    Slot++;
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Car Exited");
-    delay(2000);
+  // Exit Sensor Trigger
+  if (digitalRead(IR_EXIT) == LOW && !exitFlag) {
+    exitFlag = true;
+    SLOT_COUNT++;
+    openGate("Car Exited");
   }
 
-  // Reset gate and flags
-  if (flag1 == 1 || flag2 == 1) { // Use OR to reset if either flag is set
-    delay(1000);
-    myservo.write(100); // Close gate
-    flag1 = 0;
-    flag2 = 0;
+  // Reset flags when no car
+  if (digitalRead(IR_ENTRY) == HIGH) {
+    entryFlag = false;
+  }
+  if (digitalRead(IR_EXIT) == HIGH) {
+    exitFlag = false;
   }
 
-  // Display available slots
+  // Show available slots
+  displayAvailableSlots();
+}
+
+// Function to open gate and display message
+void openGate(String message) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(message);
+  gateServo.write(0);     // Open gate
+  delay(3000);
+  gateServo.write(90);    // Close gate
+  delay(1000);
+  lcd.clear();
+}
+
+// Function to display parking full message
+void displayFullMessage() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("SORRY :( ");
+  lcd.setCursor(0, 1);
+  lcd.print("Parking Full");
+  delay(3000);
+}
+
+// Function to display available slots
+void displayAvailableSlots() {
   lcd.setCursor(0, 0);
   lcd.print("WELCOME!");
   lcd.setCursor(0, 1);
   lcd.print("Slots Left: ");
-  lcd.print(Slot);
+  lcd.print(SLOT_COUNT);
   delay(500);
 }
+
